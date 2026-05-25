@@ -4,9 +4,17 @@ import { persist } from 'zustand/middleware';
 export const useStore = create(
   persist(
     (set, get) => ({
-      // WebSocket Status (Exclude from persistence via partialize)
+      // WebSocket Status
       wsConnected: false,
-      setWsConnected: (status) => set({ wsConnected: status }),
+      setWsConnected: (status) => {
+        set({ wsConnected: status });
+        get().addLog(
+          status 
+            ? 'Neural RAG Link established (WebSocket sync online)' 
+            : 'Neural RAG Link disconnected (WebSocket offline)', 
+          status ? 'success' : 'error'
+        );
+      },
 
       // Chat Histories
       chats: {
@@ -36,16 +44,42 @@ export const useStore = create(
         averageResponseTime: 1.2,
       },
 
+      // Real-Time Telemetry Logs
+      telemetryLogs: [
+        `[${new Date().toISOString()}] ⚙️ INITIALIZING JIET TELEMETRY SHELL...`,
+        `[${new Date().toISOString()}] 📂 CONNECTING CHROMA VIRTUAL DATABASE...`,
+        `[${new Date().toISOString()}] 🖥️ SYSTEM HOST NAME: JIET_CORE_OS_MAC`
+      ],
+
+      addLog: (message, type = 'info') => set((state) => {
+        const time = new Date().toISOString();
+        const prefix = type === 'error' ? '🔴' : type === 'success' ? '🟢' : '⚡';
+        const formattedLog = `[${time}] ${prefix} ${message.toUpperCase()}`;
+        return {
+          telemetryLogs: [...(state.telemetryLogs || []).slice(-49), formattedLog]
+        };
+      }),
+
       // Configuration Actions
       setProvider: (provider) => {
         let defaultModel = 'offline-rag-v1';
-        if (provider === 'gemini') defaultModel = 'gemini-1.5-flash';
+        if (provider === 'gemini') defaultModel = 'gemini-3.5-flash';
         if (provider === 'groq') defaultModel = 'llama3-70b';
         set({ provider, model: defaultModel });
+        get().addLog(`Switched active neural engine to ${provider} (${defaultModel})`, 'success');
       },
-      setModel: (model) => set({ model }),
-      setGeminiApiKey: (key) => set({ geminiApiKey: (!key || key === 'undefined' || key === 'null') ? '' : key.trim() }),
-      setGroqApiKey: (key) => set({ groqApiKey: (!key || key === 'undefined' || key === 'null') ? '' : key.trim() }),
+      setModel: (model) => {
+        set({ model });
+        get().addLog(`Active LLM Model configuration updated to ${model}`, 'success');
+      },
+      setGeminiApiKey: (key) => {
+        set({ geminiApiKey: (!key || key === 'undefined' || key === 'null') ? '' : key.trim() });
+        get().addLog('Gemini security bindings updated', 'info');
+      },
+      setGroqApiKey: (key) => {
+        set({ groqApiKey: (!key || key === 'undefined' || key === 'null') ? '' : key.trim() });
+        get().addLog('Groq cloud key storage updated', 'info');
+      },
 
       // Actions
       addMessage: (agentId, message) => set((state) => {
@@ -53,10 +87,12 @@ export const useStore = create(
           ...state.chats,
           [agentId]: [...(state.chats[agentId] || []), message]
         };
-        // Increment query metric when user sends a message
         let newQueries = state.metrics.totalQueries;
         if (message.role === 'user') {
           newQueries += 1;
+          setTimeout(() => {
+            useStore.getState().addLog(`Query packet transmitted to ${agentId} agent: "${message.content.slice(0, 40)}${message.content.length > 40 ? '...' : ''}"`, 'info');
+          }, 0);
         }
         return {
           chats,
@@ -77,7 +113,6 @@ export const useStore = create(
             content: chat[lastMessageIndex].content + content
           };
         } else {
-          // If no AI placeholder exists, create one
           chat.push({
             role: 'ai',
             content: content,
@@ -100,16 +135,22 @@ export const useStore = create(
         }
       })),
 
-      clearHistory: (agentId) => set((state) => ({
-        chats: {
-          ...state.chats,
-          [agentId]: []
-        }
-      })),
+      clearHistory: (agentId) => {
+        set((state) => ({
+          chats: {
+            ...state.chats,
+            [agentId]: []
+          }
+        }));
+        get().addLog(`Purged and flushed neural memories for agent: ${agentId}`, 'error');
+      },
 
       updateResponseTime: (timeSec) => set((state) => {
         const currentAvg = state.metrics.averageResponseTime;
-        const newAvg = parseFloat(((currentAvg * 4 + timeSec) / 5).toFixed(2)); // running average
+        const newAvg = parseFloat(((currentAvg * 4 + timeSec) / 5).toFixed(2));
+        setTimeout(() => {
+          useStore.getState().addLog(`Stream chunk resolved successfully in ${timeSec} seconds.`, 'success');
+        }, 0);
         return {
           metrics: {
             ...state.metrics,
@@ -131,7 +172,6 @@ export const useStore = create(
         }
         return state;
       },
-      // Persist only key states, histories, settings, and metrics (exclude ephemeral loading/ws statuses)
       partialize: (state) => ({
         chats: state.chats,
         provider: state.provider,

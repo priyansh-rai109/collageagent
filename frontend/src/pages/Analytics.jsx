@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel';
 import Card from '../components/ui/Card';
@@ -10,6 +11,13 @@ export default function Analytics() {
   const provider = useStore(state => state.provider);
   const model = useStore(state => state.model);
   const wsConnected = useStore(state => state.wsConnected);
+  const telemetryLogs = useStore(state => state.telemetryLogs || []);
+  
+  const logsEndRef = useRef(null);
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [telemetryLogs]);
 
   const agentsTelemetry = [
     { id: 'academic', name: 'Academic AI Agent', icon: BrainCircuit, color: 'text-blue-400 border-blue-500/20 bg-blue-500/5' },
@@ -117,15 +125,20 @@ export default function Analytics() {
                 <Terminal className="w-3.5 h-3.5" />
                 <span>sh-node</span>
               </div>
-              <div className="space-y-2 overflow-y-auto flex-1 scrollbar-hide">
-                <p className="text-gray-500">[2026-05-20T00:15:30.012Z] INITIALIZING JIET TELEMETRY SHELL...</p>
-                <p className="text-gray-500">[2026-05-20T00:15:30.224Z] CONNECTING CHROMA VIRTUAL DATABASE...</p>
-                <p className="text-gray-400">[2026-05-20T00:15:30.410Z] SYSTEM HOST NAME: JIET_CORE_OS_MAC</p>
-                <p className="text-gray-400">[2026-05-20T00:15:30.560Z] BACKEND SOCKET TARGET: ws://127.0.0.1:8000/ws</p>
-                <p className="text-emerald-400">[2026-05-20T00:15:31.002Z] SOCKET SYNC STATUS: {wsConnected ? 'SUCCESS (ESTABLISHED)' : 'PENDING (RECONNECTING...)'}</p>
-                <p className="text-emerald-400">[2026-05-20T00:15:31.142Z] ACTIVE CORE DRIVER: {provider.toUpperCase()} ENGINE</p>
-                <p className="text-emerald-400">[2026-05-20T00:15:31.250Z] LLM COMPATIBLE BINDINGS: {model.toUpperCase()}</p>
-                <p className="text-gray-600 mt-4">&gt;_ System diagnostics online. Listening for incoming neural inputs...</p>
+              <div className="space-y-2 overflow-y-auto flex-1 scrollbar-hide pr-1">
+                {telemetryLogs.map((log, index) => {
+                  let colorClass = 'text-gray-400 font-mono';
+                  if (log.includes('🟢')) colorClass = 'text-emerald-400 font-mono font-bold';
+                  if (log.includes('🔴')) colorClass = 'text-red-400 font-mono font-bold';
+                  if (log.includes('⚙️') || log.includes('📂') || log.includes('🖥️')) colorClass = 'text-gray-500 font-mono';
+                  return (
+                    <p key={index} className={`text-[10px] break-all leading-normal ${colorClass}`}>
+                      {log}
+                    </p>
+                  );
+                })}
+                <div ref={logsEndRef} />
+                <p className="text-purple-400 mt-4 animate-pulse font-mono text-[10px]">&gt;_ System diagnostics online. Listening for incoming neural inputs...</p>
               </div>
             </div>
           </motion.div>
